@@ -1,0 +1,269 @@
+% Created 2023-04-27 Thu 12:21
+% Intended LaTeX compiler: pdflatex
+\documentclass[11pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{graphicx}
+\usepackage{longtable}
+\usepackage{wrapfig}
+\usepackage{rotating}
+\usepackage[normalem]{ulem}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{capt-of}
+\usepackage{hyperref}
+\author{Yang Huang\thanks{yangh2@andrew.cmu.edu}}
+\date{\textit{<2023-02-22 Wed>}}
+\title{README}
+\hypersetup{
+ pdfauthor={Yang Huang},
+ pdftitle={README},
+ pdfkeywords={},
+ pdfsubject={},
+ pdfcreator={Emacs 28.2 (Org mode 9.5.5)}, 
+ pdflang={English}}
+\begin{document}
+
+\maketitle
+\tableofcontents
+
+
+\section{Purpose}
+\label{sec:orgbc14243}
+The purpose of this document is to explain how to calculate 3-body distribution function
+from a XDATCAR file (VASP output). You are free to modify and
+redistribute the code for general purpose.
+
+The basic idea of this program is to divide a BIG XDATCAR file into a
+reasonable amount (2 or 3 times of cpus on a cluster) of samller
+XDATCAR files and calculate 3-body distribution functions for each
+individual job. The final distribution function is obtained by averaging
+over distribution functions from these jobs.
+
+This program works best for small systems with long MD
+simulations and worst for very large systems. Meanwhile it requires a
+great amount of memory to allocate large arrays (depending on number
+of bins in your 3-body distribution function histogram) for each job. 
+
+\section{List of tools}
+\label{sec:org60e9ebb}
+Tools that are implicitly required by others are labeled with [IMPLICIT].
+
+\subsection{init\_bins.awk [IMPLICIT]}
+\label{sec:org554ce06}
+Generate input files. Required by init\_bin.sh.
+
+\subsection{init\_bins.sh [IMPLICIT]}
+\label{sec:org365d0fc}
+Initialize basic settings for slurm\_3bdfxdat runs. Required by slurm\_3bdfxdat.
+
+\subsection{split\_xdat.awk [IMPLICIT]}
+\label{sec:org4a15537}
+Split XDATCAR file into individual split files. Required by slurm\_3bdfxdat.
+
+\subsection{3bdfxdat\_bundle.sh [IMPLICIT]}
+\label{sec:orgb1aceea}
+Bundle a group of split files and calculate their 3-body distribution function. Required by slurm\_3bdfxdat.
+
+\subsection{slurm\_3bdfxdat}
+\label{sec:org3cdd7e3}
+Submit a 3-body distribution function calculation job. 
+
+\subsection{3bdfxdat\_sum}
+\label{sec:org2f0d88e}
+Summarize all statistical results from a slurm\_3bdfxdat sjob.
+
+\subsection{3bdf2s3}
+\label{sec:orgb974f79}
+Calculate 3-body entropy based on results from 3bdfxdat\_sum and
+generate supplementary files.
+
+\subsection{3bdf2s3\_eps}
+\label{sec:orgc3666e0}
+Calculate 3-body entropy based on results from 3bdfxdat\_sum and
+generate supplementary files. Leave out all the ambiguity about
+numerical integrals and interpolations caused by the shape of
+histograms. It is expected to give an upper boundary of S3.
+
+\subsection{Post-analysis tools}
+\label{sec:org077ce83}
+\begin{enumerate}
+\item 3bdf\_view\_theta
+Print out angular distribution of bond R1 and bond R2.
+Usage:
+./3bdf\_view\_theta fname R1 R2
+output
+theta[0,PI] R3[A] f
+\item 3bdfMsup [OBSOLETE] 
+Print out g3-g2g2g2
+\item 3bdf\_print\_sup [OBSOLETE]
+Print out g2g2g2
+\item 3bdf2s3\_interp.py
+Interpolate S3info and S3fluct and write the tot S3.
+output four columns to the STDOUT which are R[A], S3tot, S3Fluct, S3info.
+\end{enumerate}
+
+\section{How to}
+\label{sec:org6774adb}
+
+\subsection{How to install}
+\label{sec:org021ed54}
+To compile, type "make cleanall" and "make" in the main directory.
+Then type "./install.sh" to link binaries to your "\textasciitilde{}/bin".
+All tools except slurm\_3bdfxdat are now in your default bin directory.
+
+\subsection{How to run}
+\label{sec:org3a90835}
+Copy "slurm\_3bdfxdat" to your run directory and modify the slurm
+script at your needs. Prepare all input files and submit the slurm
+script e.g. "sbatch -p n12 -n 12 slurm\_3bdfxdat".
+
+\subsection{How to analyze}
+\label{sec:org50786a6}
+The slurm\_3bdfxdat will provide separate "3bdf\_bins.dat" files for a
+certain number samples. Use "3bdfxdat\_sum" to gather all histograms
+from each "3bdf\_bins.dat" file and write the overall histogram to an
+output file "3bdf\_bins.dat-sum". Use "3bdf2s3" to normalize the
+histogram from " 3bdf\_bins.dat-sum" which gives a 3-body distribution
+function and compute S3 from 3bdf. Use "3bdf\_view\_theta" and "xmgrace"
+to visualize your calculation.
+
+\subsection{Example: liquid Boron}
+\label{sec:org10a535d}
+Go to examples/data and submit slurm\_3bdfxdat
+
+\section{Usage in details}
+\label{sec:org1bb65f0}
+
+\subsection{slurm\_3bdfxdat}
+\label{sec:org341ca96}
+
+\subsubsection{Required files}
+\label{sec:org7658a5c}
+\begin{itemize}
+\item Trun
+This file contains in value which is the temperature of MD simulation.
+\item Mass
+This file contains three rows:
+\begin{enumerate}
+\item type of species.
+\item atomic numbers.
+\item atomic masses [a.u.] in atomic units.
+\end{enumerate}
+\item POSCAR
+The POSCAR should be consistent with the XDATCAR file but not
+necessary to be one of the structures in the XDATCAR file.
+\item pdf.HH
+Pair distribution functions. You can generate those using "pdfxdat"
+command.
+\item XDATCAR 
+This has to be a XDATCAR file from AIMD NVT simulation. Be careful
+about the different in format of XDATCAR from a NVT simulation and a
+NPT simulation.
+\end{itemize}
+
+\subsubsection{Modify the slurm script at your needs}
+\label{sec:org17c195f}
+\begin{itemize}
+\item Cut-off radius
+We use R1, R2 and THETA to control the shape of our histogram. By
+default, R1, R2 have the same range [rmin, rmax] and the range of
+theta depends on R1 and R2. By changing "rmin" and "rmax" in the slurm template, you can
+balance your calculation efficiency and accuracy.
+It is recommended to have "rmax" no longer than a quarter of the
+size of your box and use "rmin" to remove empty regime.
+\item Number of bins
+The number of bins for R1 and R2 are specified by dR where
+NR=CEIL[(rmax-rmin)/dR]. For THETA, it is more complex. See the
+[add a link to the ref] pdf for details.
+\item Distribute jobs
+In seeking of efficiency, you have to tell the script the number of
+individual 3bdfxdat runs depending on the number of cpus on your
+cluster. To do that, you can change "nsample", "njobs" and "nxdat"
+in the script which follow "nsamples=njobs*nxdat".
+\begin{itemize}
+\item "nsampels": the number samples you want to gather from a XDATCAR
+file to calculate 3-body distribute function.
+\item "njobs" : "nsampels" structures will be divided evenly into \$njobs
+subroutines.
+\item "nxdat" : each subroutines have to deal with "nxdat"
+single-structure XDATCAR files.
+\end{itemize}
+\end{itemize}
+
+\subsubsection{Submit jobs}
+\label{sec:org16313d7}
+Now you can submit the slurm\_3bdfxdat. On euler, it is "sbatch -p n12
+-n slurm\_3bdfxdat".
+
+\subsubsection{Output}
+\label{sec:org1761365}
+It will return a series of 3bdf\_bins.dat\_??? files where "???" is the
+index of first structures in the XDATCAR file. Each 3bdf\_bins.dat\_???
+contains a statistical histogram after analyzing "nxdat" amount of files.
+In 3bdf\_bins.dat\_???, the first line is the number of analyzed xdatcar
+files "nxdat", the second line is
+the number of species, the third line is "rmin", "rmax" and "dR". The
+remaining of the file contains NRxNR lines and each line is an angular
+distribution histogram of bond R1 and bond R2 at their length intervals.
+
+\subsection{3bdfxdat\_sum}
+\label{sec:org058fe24}
+To summarize these 3bdf\_bins.dat\_??? files, try
+"3bdfxdat\_sum fout 3bdf\_bins.dat\_*". It will gather information from
+all 3bdf\_bins.dat\_??? files and write to the "fout". These
+3bdf\_bins.dat\_??? files can have different number of samples. For
+example, the "3bdf\_bins.dat\_1" may have analyzed 100 samples while the
+"3bdf\_bins.dat\_2" only contains 20 samples. In this way, it is
+convenient to add additional information to existing results.
+
+\subsection{3bdf2s3}
+\label{sec:org58126b8}
+The statistical work is quite standard and should have less ambiguity
+in definitions. Yet the normalization  of the 3-body histogram and
+3-body entropy calculation are more subtle and involves detailed
+numerical realization and terminology definitions. It is recommended
+to check the code and test with a few examples before you make any
+conclusions. See the [add a link to the ref] pdf file for more description of
+implementation of normalization and integrals.
+
+To run "3bdf2s3", try "3bdf2s3 fin dim", for instance, "3bdf2s3
+3bdf\_bins.dat-sum 3". This will normalize the histogram in
+"3bdf\_bins.dat-sum" and compute the "S3Fluct" and "S3Info" based on
+given "dim". Because pair distribution function and 3-body
+distribution function are obtained with different programs and hence
+with different shapes of histograms (different rmin, rmax and dr), we
+use "dim" to navigate the integration based on a dimxdimxdim mesh grid
+where functions at each grid are interpolated from pair correlation functions.
+
+The program generates three files: S3B.dat, S3B-ext.dat S3Fluct.dat and
+S3Info.dat. Each contains two columns: the Rc and fval.  The
+mathematical expression are shown in the [add a link to the ref].
+
+S3B-ext.dat only depends on two-body correlation function while
+S3B.dat is interpolated to the shape of 3bdf bins. In principle, these
+two agree when sizes of 3bdf bins equal to sizes of pdf bins. In
+general, S3B-ext is more accurate because pdf usually has finer bin settings.
+
+\subsection{3bdf2s3\_eps [OBSOLETE]}
+\label{sec:orgf5f5828}
+This command tends to minimize the differences between superposition
+g2g2g2 and 3-body distribution histogram g3. In realization, the
+command defines a difference function (Eps=g3-g2g2g2), and  for each
+binned g3, it will find a possible range [supp\_min, supp\_max] of g2g2g2  within the bin's
+volume. Three conditions may occur.
+\begin{enumerate}
+\item g3<supp\_min: Eps=g3-supp\_min;
+\item g3>supp\_max: Eps=g3-supp\_max;
+\item supp\_min<g3<supp\_max: Eps=0;
+\end{enumerate}
+In the way, it estimates the upper bound of S3 and reduces the errors
+from numerical solutions and simulation noises.
+
+To run "3bdf2s3\_eps", try "3bdf2s3 fin", for instance, "3bdf2s3
+3bdf\_bins.dat-sum". This will normalize the histogram in
+"3bdf\_bins.dat-sum" and compute the "S3Fluct" and "S3Info".
+
+The program generates three files: S3B.dat, S3Fluct.dat and
+S3Info.dat. Each contains two columns: the Rc and fval.  
+\end{document}

@@ -1,0 +1,32 @@
+SYSTEM = Al300
+
+ Startparameter for this Run:
+   ISTART =      1    job   : 0-new  1-cont  2-samecut
+
+ Electronic Relaxation
+   PREC   = Normal
+   NELM   =     40;   
+   EDIFF  =   1E-06   stopping-criterion for ELM
+
+NEDOS = 2001
+
+ Ionic Relaxation
+ALGO = Fast
+LREAL = A
+NSW = 100
+ISIF = 0
+IBRION = 0
+POTIM = 1.0
+
+ DOS related values:
+   ISMEAR =  -1
+SIGMA = 0.34468
+
+LWAVE = F
+LCHARG = F
+
+TEBEG = 4000
+TEEND = 4000
+SMASS = 0
+NCORE = 8
+NWRITE = 0
